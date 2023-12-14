@@ -1,0 +1,12 @@
+[package]
+edition = "2021"
+name = "rxec-core"
+version = "0.1.0"
+
+[features]
+alloc = []
+default = ["alloc"]
+
+[dependencies]
+spin = "0.9"
+tuple_list = {version = "0.1", default-features = false}

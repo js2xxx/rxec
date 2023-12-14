@@ -1,0 +1,20 @@
+[package]
+edition = "2021"
+name = "rxec-util"
+version = "0.1.0"
+
+[features]
+alloc = ["dep:oneshot", "dep:either-slot", "rxec-core/alloc"]
+default = ["std"]
+std = ["alloc", "oneshot/std"]
+
+[dependencies]
+# Local crates
+rxec-core = {path = "../core", default-features = false}
+# External crates
+either = {version = "1.9", default-features = false}
+either-slot = {version = "1.2", optional = true}
+oneshot = {version = "0.1", default-features = false, features = ["async"], optional = true}
+pin-project = {version = "1.1"}
+spin = "0.9"
+tuple_list = {version = "0.1", default-features = false}
