@@ -16,8 +16,8 @@ mod value;
 #[cfg(feature = "alloc")]
 mod wait;
 
-#[cfg(feature = "std")]
-pub use self::wait::wait;
+use rxec_core::Sender;
+
 pub use self::{
     bind::{bind, Bind},
     eager::{eager, Eager},
@@ -35,7 +35,11 @@ pub use self::{
     select::{select, Select},
     wait::Async,
 };
-use rxec_core::Sender;
+#[cfg(feature = "std")]
+pub use self::{
+    sched::{ArcLoop, ArcLoopExec, ArcLoopSender, Loop, LoopExec, LoopSender},
+    wait::wait,
+};
 
 pub trait SenderExt: Sender + Sized {
     fn bind<F, T>(self, f: F) -> Bind<Self, F>
@@ -92,13 +96,41 @@ impl<S: Sender> SenderExt for S {}
 #[macro_export]
 macro_rules! exec {
     {@ $e:expr} => ($e);
-    {$e:expr} => ($crate::value($e));
+    {$e:expr} => ($crate::sender::value($e));
     {let $v:pat = @ $e:expr $(=> $ty:ty)?; $($t:tt)*} => {{
         let closure = move |$v $(:$ty)?| $crate::exec!($($t)*);
-        $crate::bind($e, closure)
+        $crate::sender::bind($e, closure)
     }};
     {let $v:pat = $e:expr $(=> $ty:ty)?; $($t:tt)*} => {{
         let closure = move |$v $(:$ty)?| $crate::exec!($($t)*);
-        $crate::bind($crate::value($e), closure)
+        $crate::sender::bind($crate::sender::value($e), closure)
     }};
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::string::String;
+    use std::{print, println};
+
+    use super::{join_tuple, value, wait, Loop, Scheduler, SenderExt};
+
+    #[test]
+    fn basic() {
+        let rl = Loop::new();
+
+        let work1 = value(String::from("Hello"))
+            .map(|s| print!("{s} "))
+            .map(|_| 1)
+            .sched_on(&rl);
+
+        let work2 = exec! {
+            let _ = @rl.schedule();
+            let s = String::from("World");
+            let _ = println!("{s}");
+            2
+        };
+
+        let (r1, r2) = wait(join_tuple((work1, work2)));
+        assert_eq!((r1, r2), (1, 2));
+    }
 }
