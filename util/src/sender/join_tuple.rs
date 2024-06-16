@@ -4,13 +4,13 @@ use either_slot::{
     array::Element,
     tuple::{self, Concat, Count, CountOf, InElement, Index, List, Place, TakeList, Whole},
 };
-use tuple_list::{Tuple, TupleList};
-
-use self::aux::{ConstructReceiver, ReceiverList, ZipOption};
 use rxec_core::{
     tuple_list::{ExecutionList, SenderList, SenderListTo},
     Execution, Receiver, Sender, SenderTo,
 };
+use tuple_list::{Tuple, TupleList};
+
+use self::aux::{ConstructReceiver, ReceiverList, ZipOption};
 
 pub fn join_tuple<S>(s: S) -> JoinTuple<S>
 where

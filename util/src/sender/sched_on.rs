@@ -24,42 +24,18 @@ where
     Sched: Scheduler,
     Sched::Sender: SenderTo<Recv<S, R>>,
 {
-    type Execution = Exec<S, Sched, R>;
+    type Execution = <Sched::Sender as SenderTo<Recv<S, R>>>::Execution;
 
     fn connect(self, receiver: R) -> Self::Execution {
-        Exec {
-            sched: self.1,
+        self.1.schedule().connect(Recv {
             sender: self.0,
             receiver,
-        }
+        })
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Exec<S, Sched, R> {
-    sched: Sched,
-    sender: S,
-    receiver: R,
-}
-
-impl<S, Sched, R> Execution for Exec<S, Sched, R>
-where
-    S: SenderTo<R>,
-    R: ReceiverFrom<S>,
-    Sched: Scheduler,
-    Sched::Sender: SenderTo<Recv<S, R>>,
-{
-    fn execute(self) {
-        let receiver = Recv {
-            sender: self.sender,
-            receiver: self.receiver,
-        };
-        self.sched.schedule().connect(receiver).execute()
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct Recv<S, R> {
+pub struct Recv<S, R> {
     sender: S,
     receiver: R,
 }

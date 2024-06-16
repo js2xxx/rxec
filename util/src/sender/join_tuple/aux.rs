@@ -2,9 +2,8 @@ use either_slot::{
     tuple,
     tuple::{Concat, InElement, Whole},
 };
-use tuple_list::{Tuple, TupleList};
-
 use rxec_core::Receiver;
+use tuple_list::{Tuple, TupleList};
 
 pub trait ZipOption: TupleList {
     type Zipped: TupleList;

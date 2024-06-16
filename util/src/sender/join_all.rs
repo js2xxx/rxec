@@ -2,7 +2,6 @@ use alloc::vec::Vec;
 use core::iter::TrustedLen;
 
 use either_slot::array;
-
 use rxec_core::{Execution, Receiver, Sender, SenderTo};
 
 pub fn join_all<S, I>(iter: I) -> JoinAll<S, I>

@@ -2,9 +2,8 @@ use alloc::sync::Arc;
 use core::marker::PhantomData;
 
 use either::Either::{self, Left, Right};
-use spin::Mutex;
-
 use rxec_core::{Receiver, ReceiverFrom, Sender, SenderTo};
+use spin::Mutex;
 
 pub fn select<S1, S2>(s1: S1, s2: S2) -> Select<S1, S2>
 where

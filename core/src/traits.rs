@@ -28,7 +28,7 @@ pub trait Sender {
     type Output;
 }
 
-impl<F: Future> Sender for F {
+impl<F: Future + ?Sized> Sender for F {
     type Output = <F as Future>::Output;
 }
 

@@ -1,5 +1,4 @@
 use either_slot::tuple;
-
 use rxec_core::{Execution, Receiver, Sender, SenderTo};
 
 pub fn join<S1, S2>(s1: S1, s2: S2) -> Join<S1, S2>

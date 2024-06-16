@@ -8,5 +8,7 @@ pub mod tuple_list;
 #[cfg(feature = "alloc")]
 extern crate alloc;
 
-pub use self::future::{Cps, CpsExt};
-pub use self::traits::{Execution, Receiver, ReceiverFrom, Sender, SenderTo};
+pub use self::{
+    future::{Cps, CpsExt},
+    traits::{Execution, Receiver, ReceiverFrom, Sender, SenderTo},
+};

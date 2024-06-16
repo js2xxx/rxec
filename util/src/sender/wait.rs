@@ -5,7 +5,6 @@ use core::{
 };
 
 use pin_project::pin_project;
-
 use rxec_core::{Execution, Receiver, SenderTo};
 
 #[cfg(feature = "std")]

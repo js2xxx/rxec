@@ -46,9 +46,7 @@ where
     type ExecutionList = (HeadSender::Execution, TailSender::ExecutionList);
 
     fn connect_list(self, (headr, tailr): (HeadReceiver, TailReceiver)) -> Self::ExecutionList {
-        let heade = self.0.connect(headr);
-        let taile = self.1.connect_list(tailr);
-        (heade, taile)
+        (self.0.connect(headr), self.1.connect_list(tailr))
     }
 }
 
