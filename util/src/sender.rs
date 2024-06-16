@@ -1,8 +1,6 @@
 mod bind;
 mod eager;
 #[cfg(feature = "alloc")]
-mod join;
-#[cfg(feature = "alloc")]
 mod join_all;
 #[cfg(feature = "alloc")]
 mod join_tuple;
@@ -29,9 +27,8 @@ pub use self::{
 };
 #[cfg(feature = "alloc")]
 pub use self::{
-    join::{join, Join},
     join_all::{join_all, JoinAll, JoinAllExt},
-    join_tuple::{join_tuple, JoinTuple, JoinTupleExt},
+    join_tuple::{join, join_tuple, JoinTuple, JoinTupleExt},
     select::{select, Select},
     wait::Async,
 };
@@ -76,7 +73,7 @@ pub trait SenderExt: Sender + Sized {
     }
 
     #[cfg(feature = "alloc")]
-    fn join<T>(self, other: T) -> Join<Self, T>
+    fn join<T>(self, other: T) -> JoinTuple<(Self, T)>
     where
         T: Sender,
     {
@@ -112,7 +109,7 @@ mod tests {
     use alloc::string::String;
     use std::{print, println};
 
-    use super::{join_tuple, value, wait, Loop, Scheduler, SenderExt};
+    use super::{value, wait, Loop, Scheduler, SenderExt};
 
     #[test]
     fn basic() {
@@ -130,7 +127,7 @@ mod tests {
             2
         };
 
-        let (r1, r2) = wait(join_tuple((work1, work2)));
+        let (r1, r2) = wait(work1.join(work2));
         assert_eq!((r1, r2), (1, 2));
     }
 }

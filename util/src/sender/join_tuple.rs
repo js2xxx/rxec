@@ -12,6 +12,14 @@ use tuple_list::{Tuple, TupleList};
 
 use self::aux::{ConstructReceiver, ReceiverList, ZipOption};
 
+pub fn join<S1, S2>(s1: S1, s2: S2) -> JoinTuple<(S1, S2)>
+where
+    S1: Sender,
+    S2: Sender,
+{
+    JoinTuple((s1, s2))
+}
+
 pub fn join_tuple<S>(s: S) -> JoinTuple<S>
 where
     S: Tuple,
