@@ -17,19 +17,19 @@ mod wait;
 use rxec_core::Sender;
 
 pub use self::{
-    bind::{bind, Bind},
-    eager::{eager, Eager},
-    map::{map, Map},
-    sched::{schedule, Scheduler},
-    sched_on::{sched_on, SchedOn},
-    transfer::{transfer, Transfer},
-    value::{value, Value},
+    bind::{Bind, bind},
+    eager::{Eager, eager},
+    map::{Map, map},
+    sched::{Scheduler, schedule},
+    sched_on::{SchedOn, sched_on},
+    transfer::{Transfer, transfer},
+    value::{Value, value},
 };
 #[cfg(feature = "alloc")]
 pub use self::{
-    join_all::{join_all, JoinAll, JoinAllExt},
-    join_tuple::{join, join_tuple, JoinTuple, JoinTupleExt},
-    select::{select, Select},
+    join_all::{JoinAll, JoinAllExt, join_all},
+    join_tuple::{JoinTuple, JoinTupleExt, join, join_tuple},
+    select::{Select, select},
     wait::Async,
 };
 #[cfg(feature = "std")]
@@ -109,7 +109,7 @@ mod tests {
     use alloc::string::String;
     use std::{print, println};
 
-    use super::{value, wait, Loop, Scheduler, SenderExt};
+    use super::{Loop, Scheduler, SenderExt, value, wait};
 
     #[test]
     fn basic() {

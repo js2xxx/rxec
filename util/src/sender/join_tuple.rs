@@ -5,8 +5,8 @@ use either_slot::{
     tuple::{self, Concat, Count, CountOf, InElement, Index, List, Place, TakeList, Whole},
 };
 use rxec_core::{
-    tuple_list::{ExecutionList, SenderList, SenderListTo},
     Execution, Receiver, Sender, SenderTo,
+    tuple_list::{ExecutionList, SenderList, SenderListTo},
 };
 use tuple_list::{Tuple, TupleList};
 
@@ -63,13 +63,11 @@ where
     S::TupleList: SenderListTo<Z>,
     <S::TupleList as SenderList>::Output: TupleList<Tuple = O>,
     Z: TupleList,
-
     O: Concat<(R,)> + ConstructReceiver<R, Receiver = Z>,
     O::Output: Concat<()>,
     List<O, R, ()>: InElement,
     Whole<O, R, ()>: ReceiverList,
     TakeList<O, R, ()>: ZipOption<Zipped = List<O, R, ()>>,
-
     O::TupleList: Count,
     Place<O, R, ()>: Index<CountOf<O>, Output = Element<R>>,
 {
@@ -93,7 +91,6 @@ where
     S: SenderListTo<Z>,
     S::Output: TupleList<Tuple = O>,
     Z: TupleList,
-
     O: Concat<(R,)>,
     O::Output: Concat<()>,
     List<O, R, ()>: InElement,
@@ -109,22 +106,20 @@ where
     S: SenderListTo<Z>,
     S::Output: TupleList<Tuple = O>,
     Z: TupleList,
-
     O: Concat<(R,)>,
     O::Output: Concat<()>,
     List<O, R, ()>: InElement,
     Whole<O, R, ()>: ReceiverList,
     TakeList<O, R, ()>: ZipOption<Zipped = List<O, R, ()>>,
-
     O::TupleList: Count,
     Place<O, R, ()>: Index<CountOf<O>, Output = Element<R>>,
 {
     fn execute(self) {
         self.elist.execute_list();
-        if let Err(rr) = self.rr.send(self.receiver) {
-            if let Some(tlist) = rr.into_tuple_list().zip_option() {
-                ReceiverList::consume(tlist.into_tuple());
-            }
+        if let Err(rr) = self.rr.send(self.receiver)
+            && let Some(tlist) = rr.into_tuple_list().zip_option()
+        {
+            ReceiverList::consume(tlist.into_tuple());
         }
     }
 }
@@ -146,18 +141,16 @@ where
     Head::Output: Concat<Tail::Output> + Concat<Tail>,
     List<Head, Current, Tail::Output>: InElement,
     TakeList<Head, Current, Tail::Output>: ZipOption<Zipped = List<Head, Current, Tail::Output>>,
-
     <Head as Tuple>::TupleList: Count,
     Place<Head, Current, Tail::Output>: Index<CountOf<Head>, Output = Element<Current>>,
-
     R: Receiver<Whole<Head, Current, Tail>>,
     Whole<Head, Current, Tail::Output>: ReceiverList,
 {
     fn receive(self, value: Current) {
-        if let Err(rr) = self.rr.send(value) {
-            if let Some(tlist) = rr.into_tuple_list().zip_option() {
-                ReceiverList::consume(tlist.into_tuple());
-            }
+        if let Err(rr) = self.rr.send(value)
+            && let Some(tlist) = rr.into_tuple_list().zip_option()
+        {
+            ReceiverList::consume(tlist.into_tuple());
         }
     }
 }
@@ -166,10 +159,7 @@ where
 mod tests {
     use std::string::ToString;
 
-    use crate::{
-        join,
-        sender::{value, wait, SenderExt},
-    };
+    use crate::sender::{SenderExt, value, wait};
 
     #[test]
     fn t() {

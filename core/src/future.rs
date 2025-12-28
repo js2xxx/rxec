@@ -96,15 +96,6 @@ where
     }
 }
 
-pub trait CpsExt: Future + Send + Sized + 'static {
-    fn cps<R>(self, continuation: R) -> Cps<Self, R>
-    where
-        R: ReceiverFrom<Self> + Send + 'static,
-    {
-        self.connect(continuation)
-    }
-}
-
 struct WakerRef<'a> {
     inner: ManuallyDrop<Waker>,
     marker: PhantomData<&'a Waker>,

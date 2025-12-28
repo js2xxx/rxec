@@ -9,6 +9,6 @@ pub mod tuple_list;
 extern crate alloc;
 
 pub use self::{
-    future::{Cps, CpsExt},
+    future::Cps,
     traits::{Execution, Receiver, ReceiverFrom, Sender, SenderTo},
 };
