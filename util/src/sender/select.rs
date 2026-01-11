@@ -38,10 +38,7 @@ where
             shared: shared.clone(),
             marker: PhantomData,
         });
-        let e2 = self.1.connect(Recv {
-            shared,
-            marker: PhantomData,
-        });
+        let e2 = self.1.connect(Recv { shared, marker: PhantomData });
         (e1, e2)
     }
 }

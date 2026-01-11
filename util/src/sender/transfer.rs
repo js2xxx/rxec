@@ -27,10 +27,7 @@ where
     type Execution = S::Execution;
 
     fn connect(self, receiver: R) -> Self::Execution {
-        self.0.connect(Local {
-            receiver,
-            sched: self.1,
-        })
+        self.0.connect(Local { receiver, sched: self.1 })
     }
 }
 
@@ -47,10 +44,7 @@ where
     Sched::Sender: SenderTo<Remote<R, T>>,
 {
     fn receive(self, value: T) {
-        let remote = Remote {
-            receiver: self.receiver,
-            value,
-        };
+        let remote = Remote { receiver: self.receiver, value };
         self.sched.schedule().connect(remote).execute()
     }
 }

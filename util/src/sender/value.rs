@@ -18,10 +18,7 @@ where
     type Execution = Exec<T, R>;
 
     fn connect(self, receiver: R) -> Self::Execution {
-        Exec {
-            value: self.0,
-            receiver,
-        }
+        Exec { value: self.0, receiver }
     }
 }
 

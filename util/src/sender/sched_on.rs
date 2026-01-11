@@ -27,10 +27,7 @@ where
     type Execution = <Sched::Sender as SenderTo<Recv<S, R>>>::Execution;
 
     fn connect(self, receiver: R) -> Self::Execution {
-        self.1.schedule().connect(Recv {
-            sender: self.0,
-            receiver,
-        })
+        self.1.schedule().connect(Recv { sender: self.0, receiver })
     }
 }
 

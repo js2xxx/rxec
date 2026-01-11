@@ -24,10 +24,7 @@ where
     type Execution = S::Execution;
 
     fn connect(self, receiver: R) -> Self::Execution {
-        self.0.connect(Recv {
-            receiver,
-            f: self.1,
-        })
+        self.0.connect(Recv { receiver, f: self.1 })
     }
 }
 

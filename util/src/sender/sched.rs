@@ -124,10 +124,7 @@ mod run_loop {
         type Execution = LoopExec<'a, R>;
 
         fn connect(self, receiver: R) -> Self::Execution {
-            LoopExec {
-                inner: self.0,
-                recv: receiver,
-            }
+            LoopExec { inner: self.0, recv: receiver }
         }
     }
 
@@ -169,10 +166,7 @@ mod run_loop {
         type Execution = ArcLoopExec<R>;
 
         fn connect(self, receiver: R) -> Self::Execution {
-            ArcLoopExec {
-                inner: self.0,
-                recv: receiver,
-            }
+            ArcLoopExec { inner: self.0, recv: receiver }
         }
     }
 

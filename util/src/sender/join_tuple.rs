@@ -76,11 +76,7 @@ where
     fn connect(self, receiver: R) -> Self::Execution {
         let (rr, rlist) = O::construct();
         let elist = self.0.into_tuple_list().connect_list(rlist);
-        Exec {
-            elist,
-            receiver,
-            rr,
-        }
+        Exec { elist, receiver, rr }
     }
 }
 
