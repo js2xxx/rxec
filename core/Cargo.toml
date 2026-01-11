@@ -1,12 +1,14 @@
 [package]
-edition = "2024"
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
 name = "rxec-core"
-version = "0.1.0"
+version.workspace = true
 
 [features]
 alloc = []
 default = ["alloc"]
 
 [dependencies]
-spin = "0.9"
-tuple_list = {version = "0.1", default-features = false}
+spin.workspace = true
+tuple_list.workspace = true
