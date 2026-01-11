@@ -39,7 +39,7 @@ pub use self::{
 };
 
 pub trait SenderExt: Sender + Sized {
-    fn bind<F, T>(self, f: F) -> Bind<Self, F>
+    fn and_then<F, T>(self, f: F) -> Bind<Self, F>
     where
         F: FnOnce(Self::Output) -> T,
         T: Sender,
