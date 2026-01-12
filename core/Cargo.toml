@@ -5,10 +5,7 @@ license.workspace = true
 name = "rxec-core"
 version.workspace = true
 
-[features]
-alloc = []
-default = ["alloc"]
-
 [dependencies]
-spin.workspace = true
-tuple_list.workspace = true
+pin-project.workspace = true
+placid.workspace = true
+tsum.workspace = true
