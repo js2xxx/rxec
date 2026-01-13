@@ -22,7 +22,7 @@ mod tests {
     use super::*;
     use crate::{
         OperationState, Receiver, SenderTo,
-        basic::{BasicReceiver, BasicSender, BasicState, ConnectAll, SenderExpr, SenderExprTo},
+        basic::{BasicReceiver, BasicSender, State, ConnectAll, SenderExpr, SenderExprTo},
         list::{CountList, CountListT},
         util::{map::MapExpr, value::ValueExpr},
     };

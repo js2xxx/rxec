@@ -23,25 +23,24 @@ pub struct ValueState<T>(Option<T>);
 impl<T> Unpin for ValueState<T> {}
 
 impl<R: Receiver<T>, T> SenderExprTo<R> for ValueExpr<T> {
-    type State = ValueState<T>;
+    type State = ValueState<(T, R)>;
     type Error = Infallible;
     type CreateState = impl InitPin<Self::State, Error = Self::Error>;
 
-    fn create_state(data: Self::Data, _: &mut (), _: &mut R) -> Self::CreateState {
-        init::value(ValueState(Some(data)))
+    fn create_state(data: Self::Data, _: &mut (), recv: R) -> Self::CreateState {
+        init::value(ValueState(Some((data, recv))))
     }
 
-    fn start<'a>(state: Pin<&mut BasicState<Self, R>>, _: Pin<&mut ConnectAllOps<'a, Self, R>>)
+    fn start<'a>(state: Pin<&mut State<Self, R>>, _: Pin<&mut ConnectAllOps<'a, Self, R>>)
     where
-        BasicState<Self, R>: ConnectAll<'a, Self, R>,
+        State<Self, R>: ConnectAll<'a, Self, R>,
     {
-        let mut state = state.project();
-        if let (Some(recv), Some(value)) = (state.receiver.take(), state.state.0.take()) {
+        if let Some((value, recv)) = state.state_mut().0.take() {
             recv.set(value);
         }
     }
 
-    fn complete(_: Pin<&mut BasicState<Self, R>>, value: tsum::Sum<()>) {
+    fn complete(_: Pin<&mut State<Self, R>>, value: tsum::Sum<()>) {
         value.unreachable();
     }
 }

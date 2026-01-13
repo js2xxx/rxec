@@ -20,7 +20,7 @@ use tsum::{
 };
 
 use crate::{
-    basic::arc::{ListPlaceRef, ListPlaceT},
+    basic::place::{ListPlaceRef, ListPlaceT},
     list::{
         CountListT, IndexList, IndexListT, OperationStateList, PCons, PTerm, SenderList,
         SenderOutputList, UIndex, USub, USubT,
@@ -28,11 +28,8 @@ use crate::{
     traits::{ConnectOp, OperationState, Receiver, Sender, SenderOutput, SenderTo},
 };
 
-mod slot;
-pub use self::slot::CountDownSlot;
-
-mod arc;
-pub use self::arc::{ListPlace, PArc};
+mod place;
+pub use self::place::ListPlace;
 
 pub trait SenderExpr: Sized {
     type Output;
@@ -51,12 +48,12 @@ pub trait SenderExprTo<R>: SenderExpr {
     fn create_state(
         data: Self::Data,
         sub_senders: &mut Self::SubSenders,
-        receiver: &mut R,
+        receiver: R,
     ) -> Self::CreateState;
 
     fn start<'a>(state: StateRef<'_, Self, R>, subops: Pin<&mut ConnectAllOps<'a, Self, R>>)
     where
-        BasicState<Self, R>: ConnectAll<'a, Self, R>,
+        State<Self, R>: ConnectAll<'a, Self, R>,
     {
         let _ = state;
         subops.start_all();
@@ -64,8 +61,7 @@ pub trait SenderExprTo<R>: SenderExpr {
 
     fn complete(state: StateRef<'_, Self, R>, value: Sum<SenderOutputList<Self::SubSenders>>);
 }
-pub type StatePlace<S, R> = ListPlaceT<<S as SenderExpr>::SubSenders, BasicState<S, R>>;
-pub type StateRef<'a, S, R> = ListPlaceRef<'a, <S as SenderExpr>::SubSenders, BasicState<S, R>>;
+pub type StateRef<'a, S, R> = ListPlaceRef<'a, <S as SenderExpr>::SubSenders, State<S, R>>;
 
 pub struct BasicReceiver<'a, S, R, U: UIndex>
 where
@@ -89,39 +85,35 @@ where
 
 #[derive(InitPin)]
 #[pin_project]
-pub struct BasicState<S, R>
+pub struct State<S, R>
 where
     S: SenderExprTo<R>,
 {
     #[pin]
     _marker: PhantomPinned,
     #[pin]
-    pub state: S::State,
-    pub receiver: CountDownSlot<R>,
+    state: S::State,
 }
 
 pub trait ConnectList<'a, P: 'a, SubSenders: SenderList, E, U: UIndex> {
-    type Operations: OperationStateList;
+    type OpList: OperationStateList;
 
-    fn connect_list(this: P, sub_senders: SubSenders) -> impl InitPin<Self::Operations, Error = E>;
+    fn connect_list(this: P, sub_senders: SubSenders) -> impl InitPin<Self::OpList, Error = E>;
 }
 
-impl<'a, S, R, E: fmt::Debug> ConnectList<'a, Pin<&'a mut Self>, (), E, UTerm> for BasicState<S, R>
+impl<'a, S, R, P: 'a, E: fmt::Debug> ConnectList<'a, P, (), E, UTerm> for State<S, R>
 where
     S: SenderExprTo<R>,
 {
-    type Operations = PTerm;
+    type OpList = PTerm;
 
-    fn connect_list(
-        _this: Pin<&'a mut Self>,
-        _sub_senders: (),
-    ) -> impl InitPin<Self::Operations, Error = E> {
+    fn connect_list(_this: P, _sub_senders: ()) -> impl InitPin<Self::OpList, Error = E> {
         init_pin!(PTerm)
     }
 }
 
 impl<'a, S, R, T, E: fmt::Debug> ConnectList<'a, Pin<&'a mut Self>, (T, ()), E, UInt<UTerm>>
-    for BasicState<S, R>
+    for State<S, R>
 where
     S: SenderExprTo<R, SubSenders: ListPlace<Ref<'a, Self> = Pin<&'a mut Self>>> + 'a,
     R: 'a,
@@ -135,7 +127,7 @@ where
             ConnectError: Into<E>,
         >,
 {
-    type Operations = PCons<
+    type OpList = PCons<
         ConnectOp<T, BasicReceiver<'a, S, R, USubT<CountListT<S::SubSenders>, UInt<UTerm>>>>,
         PTerm,
     >;
@@ -143,7 +135,7 @@ where
     fn connect_list(
         state: Pin<&'a mut Self>,
         sub_senders: (T, ()),
-    ) -> impl InitPin<Self::Operations, Error = E> {
+    ) -> impl InitPin<Self::OpList, Error = E> {
         let head_receiver = BasicReceiver { index: PhantomData, state };
         let head_operation = sub_senders.0.connect(head_receiver);
         init_pin!(PCons(
@@ -154,24 +146,10 @@ where
     }
 }
 
-impl<'a, S, R, E: fmt::Debug> ConnectList<'a, PArc<'a, Self>, (), E, UTerm> for BasicState<S, R>
+impl<'a, S, R, Head, Tail, U, E> ConnectList<'a, Pin<&'a Self>, (Head, Tail), E, UInt<U>>
+    for State<S, R>
 where
-    S: SenderExprTo<R>,
-{
-    type Operations = PTerm;
-
-    fn connect_list(
-        _this: PArc<'a, Self>,
-        _sub_senders: (),
-    ) -> impl InitPin<Self::Operations, Error = E> {
-        init_pin!(PTerm)
-    }
-}
-
-impl<'a, S, R, Head, Tail, U, E> ConnectList<'a, PArc<'a, Self>, (Head, Tail), E, UInt<U>>
-    for BasicState<S, R>
-where
-    S: SenderExprTo<R, SubSenders: ListPlace<Ref<'a, Self> = PArc<'a, Self>>> + 'a,
+    S: SenderExprTo<R, SubSenders: ListPlace<Ref<'a, Self> = Pin<&'a Self>>> + 'a,
     R: 'a,
     // Head bounds
     CountListT<S::SubSenders>: USub<UInt<U>>,
@@ -184,71 +162,88 @@ where
         >,
     // Tail bounds
     Tail: SenderList,
-    Self: ConnectList<'a, PArc<'a, Self>, Tail, E, U>,
+    Self: ConnectList<'a, Pin<&'a Self>, Tail, E, U>,
     // Other bounds
     U: UIndex,
     E: fmt::Debug,
 {
-    type Operations = PCons<
+    type OpList = PCons<
         ConnectOp<Head, BasicReceiver<'a, S, R, USubT<CountListT<S::SubSenders>, UInt<U>>>>,
-        <Self as ConnectList<'a, PArc<'a, Self>, Tail, E, U>>::Operations,
+        <Self as ConnectList<'a, Pin<&'a Self>, Tail, E, U>>::OpList,
     >;
 
     fn connect_list(
-        this: PArc<'a, Self>,
+        state: Pin<&'a Self>,
         (head, tail): (Head, Tail),
-    ) -> impl InitPin<Self::Operations, Error = E> {
-        let head_receiver = BasicReceiver {
-            index: PhantomData,
-            state: this.clone(),
-        };
+    ) -> impl InitPin<Self::OpList, Error = E> {
+        let head_receiver = BasicReceiver { index: PhantomData, state };
         let head_operation = head.connect(head_receiver);
-        let tail_operations = Self::connect_list(this, tail);
+        let tail_operations = Self::connect_list(state, tail);
         init_pin!(PCons(head_operation.map_err(Into::into), tail_operations))
     }
 }
 
 pub trait ConnectAll<'a, S: SenderExprTo<R> + 'a, R: 'a>:
-    ConnectList<'a, StateRef<'a, S, R>, S::SubSenders, S::Error, CountListT<S::SubSenders>>
+    ConnectList<
+        'a,
+        ListPlaceRef<'a, S::SubSenders, State<S, R>>,
+        S::SubSenders,
+        S::Error,
+        CountListT<S::SubSenders>,
+    >
 {
+    type Operations: OperationStateList;
+
     fn connect_all(
-        this: StateRef<'a, S, R>,
+        this: ListPlaceRef<'a, S::SubSenders, State<S, R>>,
         sub_senders: S::SubSenders,
-    ) -> impl InitPin<Self::Operations, Error = S::Error> {
-        Self::connect_list(this, sub_senders)
-    }
+    ) -> impl InitPin<Self::Operations, Error = S::Error>;
 }
 impl<'a, S, R, T> ConnectAll<'a, S, R> for T
 where
     S: SenderExprTo<R> + 'a,
     R: 'a,
-    T: ConnectList<'a, StateRef<'a, S, R>, S::SubSenders, S::Error, CountListT<S::SubSenders>>,
+    T: ConnectList<
+            'a,
+            ListPlaceRef<'a, S::SubSenders, State<S, R>>,
+            S::SubSenders,
+            S::Error,
+            CountListT<S::SubSenders>,
+        >,
 {
+    type Operations = T::OpList;
+
+    fn connect_all(
+        this: ListPlaceRef<'a, S::SubSenders, State<S, R>>,
+        sub_senders: S::SubSenders,
+    ) -> impl InitPin<Self::Operations, Error = S::Error> {
+        Self::connect_list(this, sub_senders)
+    }
 }
 
-pub type ConnectAllOps<'a, S, R> = <BasicState<S, R> as ConnectList<
-    'a,
-    StateRef<'a, S, R>,
-    <S as SenderExpr>::SubSenders,
-    <S as SenderExprTo<R>>::Error,
-    CountListT<<S as SenderExpr>::SubSenders>,
->>::Operations;
+pub type ConnectAllOps<'a, S, R> = <State<S, R> as ConnectAll<'a, S, R>>::Operations;
 
-impl<S, R> BasicState<S, R>
+impl<S, R> State<S, R>
 where
     S: SenderExprTo<R>,
 {
-    fn new(
+    pub(super) fn new(
         data: S::Data,
         sub_senders: &mut S::SubSenders,
-        mut receiver: R,
+        receiver: R,
     ) -> impl InitPin<Self, Error = S::Error> {
-        let count = S::receiver_count_down(&data);
-        init_pin!(BasicState {
+        init_pin!(State {
             _marker: PhantomPinned,
-            state: S::create_state(data, sub_senders, &mut receiver),
-            receiver: init::with(|| CountDownSlot::new(count, receiver)).adapt_err(),
+            state: S::create_state(data, sub_senders, receiver),
         })
+    }
+
+    pub fn state(self: Pin<&Self>) -> Pin<&S::State> {
+        self.project_ref().state
+    }
+
+    pub fn state_mut(self: Pin<&mut Self>) -> Pin<&mut S::State> {
+        self.project().state
     }
 }
 
@@ -258,7 +253,7 @@ pub struct BasicOperation<'a, S, R>
 where
     S: SenderExprTo<R> + 'a,
     R: 'a,
-    BasicState<S, R>: ConnectAll<'a, S, R>,
+    State<S, R>: ConnectAll<'a, S, R>,
 {
     #[pin]
     _marker: PhantomPinned,
@@ -270,14 +265,14 @@ where
     sub_ops: ConnectAllOps<'a, S, R>,
     // `state` itself must not be accessed since creation.
     #[pin]
-    state: StatePlace<S, R>,
+    state: ListPlaceT<S::SubSenders, State<S, R>>,
 }
 
 impl<'a, S, R> BasicOperation<'a, S, R>
 where
     S: SenderExprTo<R> + 'a,
     R: 'a,
-    BasicState<S, R>: ConnectAll<'a, S, R>,
+    State<S, R>: ConnectAll<'a, S, R>,
 {
     pub fn new(
         data: S::Data,
@@ -300,28 +295,30 @@ where
             let ptr = uninit.as_mut_ptr();
             let state = &raw mut (*ptr).state;
             let sub_ops = &raw mut (*ptr).sub_ops;
+            {
+                let mut subslot = ManuallyDrop::new(DroppingSlot::new());
+                let subslot_ref = DropSlot::new_unchecked(&mut subslot);
 
-            let mut subslot = ManuallyDrop::new(DroppingSlot::new());
-            let subslot_ref = DropSlot::new_unchecked(&mut subslot);
-
-            let value = BasicState::new(data, &mut sub_senders, receiver);
-            let state_init = <S::SubSenders as ListPlace>::init_place(value);
-            match Uninit::from_raw(state).try_write_pin(state_init, subslot_ref) {
-                Ok(p) => mem::forget(p),
-                Err(err) => return Err(InitPinError::new(err.error, uninit, slot)),
+                let value = State::new(data, &mut sub_senders, receiver);
+                let state_init = <S::SubSenders as ListPlace>::init_place(value);
+                match Uninit::from_raw(state).try_write_pin(state_init, subslot_ref) {
+                    Ok(p) => mem::forget(p),
+                    Err(err) => return Err(InitPinError::new(err.error, uninit, slot)),
+                }
             }
+            {
+                let mut subslot = ManuallyDrop::new(DroppingSlot::new());
+                let subslot_ref = DropSlot::new_unchecked(&mut subslot);
 
-            let mut subslot = ManuallyDrop::new(DroppingSlot::new());
-            let subslot_ref = DropSlot::new_unchecked(&mut subslot);
-
-            let borrow = <S::SubSenders as ListPlace>::move_out(Pin::new_unchecked(&mut *state));
-            let ops_init =
-                <BasicState<S, R> as ConnectAll<'a, S, R>>::connect_all(borrow, sub_senders);
-            match Uninit::from_raw(sub_ops).try_write_pin(ops_init, subslot_ref) {
-                Ok(p) => mem::forget(p),
-                Err(err) => {
-                    state.drop_in_place();
-                    return Err(InitPinError::new(err.error, uninit, slot));
+                let borrow = <S::SubSenders as ListPlace>::borrow(Pin::new_unchecked(&mut *state));
+                let ops_init =
+                    <State<S, R> as ConnectAll<'a, S, R>>::connect_all(borrow, sub_senders);
+                match Uninit::from_raw(sub_ops).try_write_pin(ops_init, subslot_ref) {
+                    Ok(p) => mem::forget(p),
+                    Err(err) => {
+                        state.drop_in_place();
+                        return Err(InitPinError::new(err.error, uninit, slot));
+                    }
                 }
             }
 
@@ -333,12 +330,12 @@ where
 impl<'a, S, R> OperationState for BasicOperation<'a, S, R>
 where
     S: SenderExprTo<R>,
-    BasicState<S, R>: ConnectAll<'a, S, R>,
+    State<S, R>: ConnectAll<'a, S, R>,
     ConnectAllOps<'a, S, R>: OperationStateList,
 {
     fn start(self: Pin<&mut Self>) {
         let this = self.project();
-        let state = <S::SubSenders as ListPlace>::move_out(this.state);
+        let state = <S::SubSenders as ListPlace>::borrow(this.state);
         S::start(state, this.sub_ops);
     }
 }
@@ -373,7 +370,7 @@ impl<'a, S, R> SenderTo<R> for BasicSender<'a, S>
 where
     S: SenderExprTo<R> + 'a,
     R: Receiver<S::Output> + 'a,
-    BasicState<S, R>: ConnectAll<'a, S, R>,
+    State<S, R>: ConnectAll<'a, S, R>,
 {
     type Operation = BasicOperation<'a, S, R>;
     type ConnectError = S::Error;

@@ -14,10 +14,10 @@ pub struct AndThenExpr<S, F>(PhantomData<(S, F)>);
 
 #[derive(InitPin)]
 #[pin_project]
-pub struct AndThenState<O, F> {
+pub struct AndThenState<O, F, R> {
     #[pin]
     pinned: PhantomPinned,
-    func: Option<F>,
+    data: Option<(F, R)>,
     #[pin]
     next_op: DynPlace<O>,
 }
@@ -44,22 +44,21 @@ where
     T: SenderTo<R, Operation: Sized>,
     R: ReceiverFrom<T>,
 {
-    type State = AndThenState<T::Operation, F>;
+    type State = AndThenState<T::Operation, F, R>;
     type Error = Infallible;
     type CreateState = impl InitPin<Self::State, Error = Self::Error>;
 
-    fn create_state(data: Self::Data, _: &mut Self::SubSenders, _: &mut R) -> Self::CreateState {
+    fn create_state(data: Self::Data, _: &mut Self::SubSenders, recv: R) -> Self::CreateState {
         init_pin!(AndThenState {
             pinned: PhantomPinned,
-            func: || Some(data),
+            data: || Some((data, recv)),
             next_op: DynPlace::new,
         })
     }
 
-    fn complete(state: Pin<&mut BasicState<Self, R>>, value: Sum![S::Output]) {
-        let b = state.project();
-        let state = b.state.project();
-        if let (Some(func), Some(recv)) = (state.func.take(), b.receiver.take()) {
+    fn complete(state: Pin<&mut State<Self, R>>, value: Sum![S::Output]) {
+        let state = state.state_mut().project();
+        if let Some((func, recv)) = state.data.take() {
             let next_sender = func(value.into_inner());
             let next_op = next_sender.connect(recv);
 

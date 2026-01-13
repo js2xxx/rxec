@@ -23,7 +23,7 @@ where
     }
 }
 
-pub struct MapState<F>(Option<F>);
+pub struct MapState<T>(Option<T>);
 
 impl<F> Unpin for MapState<F> {}
 
@@ -33,17 +33,16 @@ where
     S: Sender,
     R: Receiver<T>,
 {
-    type State = MapState<F>;
+    type State = MapState<(F, R)>;
     type Error = Infallible;
     type CreateState = impl InitPin<Self::State, Error = Self::Error>;
 
-    fn create_state(data: Self::Data, _: &mut Self::SubSenders, _: &mut R) -> Self::CreateState {
-        init::with(move || MapState(Some(data)))
+    fn create_state(data: Self::Data, _: &mut Self::SubSenders, recv: R) -> Self::CreateState {
+        init::with(move || MapState(Some((data, recv))))
     }
 
-    fn complete(state: Pin<&mut BasicState<Self, R>>, value: Sum![S::Output]) {
-        let mut state = state.project();
-        if let (Some(func), Some(recv)) = (state.state.0.take(), state.receiver.take()) {
+    fn complete(state: Pin<&mut State<Self, R>>, value: Sum![S::Output]) {
+        if let Some((func, recv)) = state.state_mut().0.take() {
             let result = func(value.into_inner());
             recv.set(result);
         }
