@@ -101,11 +101,11 @@ pub trait OperationStateList: PinnedList {
     /// See [`OperationState::start`].
     ///
     /// [`OperationState::start`]: crate::traits::OperationState::start
-    unsafe fn start_all(self: Pin<&mut Self>);
+    unsafe fn start_list_by_ref(self: Pin<&mut Self>);
 }
 
 impl OperationStateList for PTerm {
-    unsafe fn start_all(self: Pin<&mut Self>) {}
+    unsafe fn start_list_by_ref(self: Pin<&mut Self>) {}
 }
 
 impl<Head, Tail> OperationStateList for PCons<Head, Tail>
@@ -113,12 +113,12 @@ where
     Head: crate::traits::OperationState,
     Tail: OperationStateList,
 {
-    unsafe fn start_all(self: Pin<&mut Self>) {
+    unsafe fn start_list_by_ref(self: Pin<&mut Self>) {
         let PConsProj(head, tail) = self.project();
         // SAFETY: Recursion invariant holds.
         unsafe {
             head.start_by_ref();
-            tail.start_all();
+            tail.start_list_by_ref();
         }
     }
 }

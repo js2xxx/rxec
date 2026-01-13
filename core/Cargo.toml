@@ -5,8 +5,14 @@ license.workspace = true
 name = "rxec-core"
 version.workspace = true
 
+[features]
+default = ["std"]
+std = ["oneshot/std"]
+
 [dependencies]
+oneshot.workspace = true
 pin-project.workspace = true
 placid.workspace = true
 spin.workspace = true
+thiserror.workspace = true
 tsum.workspace = true

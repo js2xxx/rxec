@@ -165,7 +165,7 @@ where
         })
     }
 
-    unsafe fn start(state: StateRef<'_, Self, R>, _: Pin<&mut ConnectAllOps<Self, R>>)
+    fn start(state: StateRef<'_, Self, R>, _: Pin<&mut ConnectAllOps<Self, R>>)
     where
         State<Self, R>: ConnectAll<Self, R>,
     {
@@ -245,7 +245,7 @@ mod tests {
 
         {
             // Mimicking a future that is slow enough for us to
-            // cancel it before it completes (which would be out
+            // cancel it before it completes (when would be out
             // of our lifetime).
             let s = and_then(map(async_(TestFuture(None)), |i| i + 1), |t| value(t + 2));
             let op = pown!(s.connect(DummyReceiver));

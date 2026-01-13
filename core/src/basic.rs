@@ -50,16 +50,13 @@ pub trait SenderExprTo<R>: SenderExpr {
         receiver: R,
     ) -> Self::CreateState;
 
-    /// # Safety
-    ///
-    /// See [`OperationState::start`].
-    unsafe fn start(state: StateRef<'_, Self, R>, subops: Pin<&mut ConnectAllOps<Self, R>>)
+    fn start(state: StateRef<'_, Self, R>, subops: Pin<&mut ConnectAllOps<Self, R>>)
     where
         State<Self, R>: ConnectAll<Self, R>,
     {
         let _ = state;
         // SAFETY: Recursion invariant holds.
-        unsafe { subops.start_all() };
+        unsafe { subops.start_list_by_ref() };
     }
 
     fn complete(state: StateRef<'_, Self, R>, value: Sum<SenderOutputList<Self::SubSenders>>);
@@ -369,7 +366,7 @@ where
     unsafe fn start_by_ref(self: Pin<&mut Self>) {
         let this = self.project();
         let state = <S::SubSenders as ListPlace>::borrow(this.state);
-        unsafe { S::start(state, this.sub_ops) };
+        S::start(state, this.sub_ops);
     }
 }
 
