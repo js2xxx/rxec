@@ -219,8 +219,8 @@ mod tests {
     fn it_works() {
         {
             let s = and_then(map(async_(TestFuture), |i| i + 1), |t| value(t + 2));
-            let i = s.connect(DummyReceiver);
-            OperationState::start(pown!(i));
+            let op = pown!(s.connect(DummyReceiver));
+            OperationState::start(op);
         }
         assert!(DROPPED.get());
         let waker = WAKER.replace(None).unwrap();
