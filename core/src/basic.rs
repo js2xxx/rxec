@@ -360,7 +360,7 @@ where
     }
 }
 
-impl<S, R> OperationState for BasicOperation<S, R>
+unsafe impl<S, R> OperationState for BasicOperation<S, R>
 where
     S: SenderExprTo<R>,
     State<S, R>: ConnectAll<S, R>,

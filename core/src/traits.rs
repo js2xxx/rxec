@@ -15,7 +15,11 @@ pub trait Receiver<T> {
 pub trait ReceiverFrom<S: Sender + ?Sized>: Receiver<S::Output> {}
 impl<T, S: Sender> ReceiverFrom<S> for T where T: Receiver<S::Output> {}
 
-pub trait OperationState {
+/// # Safety
+///
+/// The implementor must ensure the safety contract of the methods.
+/// `OperationState::start` must not be reimplemented.
+pub unsafe trait OperationState {
     /// Start the operation by reference.
     ///
     /// # Safety

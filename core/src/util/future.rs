@@ -15,7 +15,7 @@ use crate::{Receiver, basic::*};
 
 pub struct FutureExpr<F>(PhantomData<F>);
 
-struct FutureStateInner<F, R>
+struct FutureData<F, R>
 where
     F: Future + Send,
     R: Receiver<F::Output> + Send,
@@ -24,12 +24,12 @@ where
     recv: Option<R>,
 }
 
-pub struct FutureState<F, R>
+struct FutureStateInner<F, R>
 where
     F: Future + Send,
     R: Receiver<F::Output> + Send,
 {
-    inner: Mutex<Option<FutureStateInner<F, R>>>,
+    inner: Mutex<Option<FutureData<F, R>>>,
     polls_again: AtomicBool,
 }
 
@@ -50,7 +50,7 @@ where
 /// ```
 struct _TestSendInheritance;
 
-impl<F, R, T> FutureState<F, R>
+impl<F, R, T> FutureStateInner<F, R>
 where
     F: Future<Output = T> + Send,
     R: Receiver<T> + Send,
@@ -61,8 +61,9 @@ where
     //   naturally;
     // - For `Waker: 'static` which requires `F, R: 'static`, we don't actually
     //   require this because a clone of `Self` is contained by the subsequent
-    //   operation state graph, which is pinned on start before the future is
-    //   polled. That way, i
+    //   operation state graph, which is guaranteed to drop after start before the
+    //   future is polled. Thus, the future and receiver are properly dropped by
+    //   `Drop` impl of `MainFutureState`, so they don't escape their lifetimes.
     const VTABLE: RawWakerVTable = RawWakerVTable::new(
         // fn clone(self: &Arc<Self>) -> Arc<Self>
         |data| {
@@ -129,21 +130,38 @@ where
     type SubSenders = ();
 }
 
+pub struct FutureState<F, R>(Arc<FutureStateInner<F, R>>)
+where
+    F: Future + Send,
+    R: Receiver<F::Output> + Send;
+
+impl<F, R> Drop for FutureState<F, R>
+where
+    F: Future + Send,
+    R: Receiver<F::Output> + Send,
+{
+    fn drop(&mut self) {
+        // Drop the future and receiver to cancel the operation, and make sure
+        // they don't escape their lifetimes.
+        *self.0.inner.lock() = None;
+    }
+}
+
 impl<F, R, T> SenderExprTo<R> for FutureExpr<F>
 where
     F: Future<Output = T> + Send,
     R: Receiver<T> + Send,
 {
-    type State = Arc<FutureState<F, R>>;
+    type State = FutureState<F, R>;
     type Error = Infallible;
     type CreateState = impl InitPin<Self::State, Error = Self::Error>;
 
     fn create_state(f: Self::Data, _: &mut (), recv: R) -> Self::CreateState {
         init::with(|| {
-            Arc::new(FutureState {
-                inner: Mutex::new(Some(FutureStateInner { f, recv: Some(recv) })),
+            FutureState(Arc::new(FutureStateInner {
+                inner: Mutex::new(Some(FutureData { f, recv: Some(recv) })),
                 polls_again: AtomicBool::new(true),
-            })
+            }))
         })
     }
 
@@ -151,18 +169,11 @@ where
     where
         State<Self, R>: ConnectAll<Self, R>,
     {
-        state.state_mut().try_poll();
+        state.state_mut().0.try_poll();
     }
 
     fn complete(_: StateRef<'_, Self, R>, value: tsum::Sum<()>) {
         value.unreachable();
-    }
-
-    fn stop(state: StateRef<'_, Self, R>) {
-        let state = state.state_mut();
-        // Drop the future and receiver to cancel the operation, and make sure
-        // they don't escape their lifetimes.
-        *state.inner.lock() = None;
     }
 }
 
@@ -196,7 +207,7 @@ mod tests {
         static DROPPED: Cell<bool> = const { Cell::new(false) };
     }
 
-    struct TestFuture;
+    struct TestFuture(Option<i32>);
 
     impl Future for TestFuture {
         type Output = i32;
@@ -205,7 +216,10 @@ mod tests {
             cx: &mut core::task::Context<'_>,
         ) -> core::task::Poll<Self::Output> {
             WAKER.set(Some(cx.waker().clone()));
-            core::task::Poll::Ready(42)
+            match self.get_mut().0.take() {
+                Some(v) => core::task::Poll::Ready(v),
+                None => core::task::Poll::Pending,
+            }
         }
     }
 
@@ -218,11 +232,26 @@ mod tests {
     #[test]
     fn it_works() {
         {
-            let s = and_then(map(async_(TestFuture), |i| i + 1), |t| value(t + 2));
+            // A immediately ready future
+            let s = and_then(map(async_(TestFuture(Some(1))), |i| i + 1), |t| {
+                value(t + 2)
+            });
             let op = pown!(s.connect(DummyReceiver));
             OperationState::start(op);
         }
-        assert!(DROPPED.get());
+        assert!(DROPPED.replace(false));
+        let waker = WAKER.replace(None).unwrap();
+        waker.wake();
+
+        {
+            // Mimicking a future that is slow enough for us to
+            // cancel it before it completes (which would be out
+            // of our lifetime).
+            let s = and_then(map(async_(TestFuture(None)), |i| i + 1), |t| value(t + 2));
+            let op = pown!(s.connect(DummyReceiver));
+            OperationState::start(op);
+        }
+        assert!(DROPPED.replace(false));
         let waker = WAKER.replace(None).unwrap();
         waker.wake();
     }
