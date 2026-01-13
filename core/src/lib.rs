@@ -1,4 +1,5 @@
 #![no_std]
+#![feature(derive_coerce_pointee)]
 #![feature(impl_trait_in_assoc_type)]
 #![feature(trait_alias)]
 

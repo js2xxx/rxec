@@ -22,22 +22,28 @@ where
         1
     }
 }
+
+pub struct MapState<F>(Option<F>);
+
+impl<F> Unpin for MapState<F> {}
+
 impl<S, F, T, R> SenderExprTo<R> for MapExpr<S, F>
 where
     F: FnOnce(S::Output) -> T,
     S: Sender,
     R: Receiver<T>,
 {
-    type State = CountDownSlot<F>;
+    type State = MapState<F>;
     type Error = Infallible;
     type CreateState = impl InitPin<Self::State, Error = Self::Error>;
 
     fn create_state(data: Self::Data, _: &mut Self::SubSenders, _: &mut R) -> Self::CreateState {
-        init::with(move || CountDownSlot::new(1, data))
+        init::with(move || MapState(Some(data)))
     }
 
-    fn complete(state: Pin<&BasicState<Self, R>>, value: Sum![S::Output]) {
-        if let (Some(func), Some(recv)) = (state.state.take(), state.receiver.take()) {
+    fn complete(state: Pin<&mut BasicState<Self, R>>, value: Sum![S::Output]) {
+        let mut state = state.project();
+        if let (Some(func), Some(recv)) = (state.state.0.take(), state.receiver.take()) {
             let result = func(value.into_inner());
             recv.set(result);
         }

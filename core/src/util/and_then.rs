@@ -1,5 +1,4 @@
 use core::{
-    cell::UnsafeCell,
     convert::Infallible,
     marker::{PhantomData, PhantomPinned},
     pin::Pin,
@@ -18,9 +17,9 @@ pub struct AndThenExpr<S, F>(PhantomData<(S, F)>);
 pub struct AndThenState<O, F> {
     #[pin]
     pinned: PhantomPinned,
-    func: CountDownSlot<F>,
+    func: Option<F>,
     #[pin]
-    next_op: UnsafeCell<DynPlace<O>>,
+    next_op: DynPlace<O>,
 }
 
 impl<S, F, T> SenderExpr for AndThenExpr<S, F>
@@ -52,27 +51,19 @@ where
     fn create_state(data: Self::Data, _: &mut Self::SubSenders, _: &mut R) -> Self::CreateState {
         init_pin!(AndThenState {
             pinned: PhantomPinned,
-            func: || CountDownSlot::new(1, data),
-            next_op: || UnsafeCell::new(DynPlace::new()),
+            func: || Some(data),
+            next_op: DynPlace::new,
         })
     }
 
-    fn complete(state: Pin<&BasicState<Self, R>>, value: Sum![S::Output]) {
-        if let (Some(func), Some(recv)) = (state.state.func.take(), state.receiver.take()) {
+    fn complete(state: Pin<&mut BasicState<Self, R>>, value: Sum![S::Output]) {
+        let b = state.project();
+        let state = b.state.project();
+        if let (Some(func), Some(recv)) = (state.func.take(), b.receiver.take()) {
             let next_sender = func(value.into_inner());
             let next_op = next_sender.connect(recv);
 
-            // Create a dedicated function to ensure the lifetime is handled correctly.
-            #[expect(clippy::mut_from_ref)]
-            const unsafe fn unsafe_pin_get<T>(t: Pin<&UnsafeCell<T>>) -> Pin<&mut T> {
-                // SAFETY: The caller must ensure that there are no concurrent accesses to the
-                // UnsafeCell while the returned Pin is in use.
-                unsafe { Pin::new_unchecked(&mut *t.get_ref().get()) }
-            }
-
-            // SAFETY: There's only 1 sub-sender, so no concurrent access.
-            let place = unsafe { unsafe_pin_get(state.project_ref().state.project_ref().next_op) };
-            if let Ok(next_op) = place.try_insert_pin(next_op) {
+            if let Ok(next_op) = state.next_op.try_insert_pin(next_op) {
                 next_op.start();
             }
         }

@@ -18,25 +18,30 @@ impl<T> SenderExpr for ValueExpr<T> {
     }
 }
 
+pub struct ValueState<T>(Option<T>);
+
+impl<T> Unpin for ValueState<T> {}
+
 impl<R: Receiver<T>, T> SenderExprTo<R> for ValueExpr<T> {
-    type State = CountDownSlot<T>;
+    type State = ValueState<T>;
     type Error = Infallible;
     type CreateState = impl InitPin<Self::State, Error = Self::Error>;
 
     fn create_state(data: Self::Data, _: &mut (), _: &mut R) -> Self::CreateState {
-        init::with(move || CountDownSlot::new(1, data))
+        init::value(ValueState(Some(data)))
     }
 
-    fn start<'a>(state: Pin<&BasicState<Self, R>>, _: Pin<&mut ConnectAllOps<'a, Self, R>>)
+    fn start<'a>(state: Pin<&mut BasicState<Self, R>>, _: Pin<&mut ConnectAllOps<'a, Self, R>>)
     where
         BasicState<Self, R>: ConnectAll<'a, Self, R>,
     {
-        if let (Some(recv), Some(value)) = (state.receiver.take(), state.state.take()) {
+        let mut state = state.project();
+        if let (Some(recv), Some(value)) = (state.receiver.take(), state.state.0.take()) {
             recv.set(value);
         }
     }
 
-    fn complete(_: Pin<&BasicState<Self, R>>, value: tsum::Sum<()>) {
+    fn complete(_: Pin<&mut BasicState<Self, R>>, value: tsum::Sum<()>) {
         value.unreachable();
     }
 }
