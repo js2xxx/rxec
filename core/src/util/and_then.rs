@@ -59,7 +59,9 @@ where
         let next_op = next_snd.connect(recv);
 
         if let Ok(next_op) = state.next_op.try_insert_pin(next_op) {
-            next_op.start();
+            // SAFETY: The operation is started only once here, and the state is not
+            // forgotten after started since it requires outer `OperationState::start`.
+            unsafe { next_op.start_by_ref() };
         }
     }
 }

@@ -50,12 +50,16 @@ pub trait SenderExprTo<R>: SenderExpr {
         receiver: R,
     ) -> Self::CreateState;
 
-    fn start(state: StateRef<'_, Self, R>, subops: Pin<&mut ConnectAllOps<Self, R>>)
+    /// # Safety
+    ///
+    /// See [`OperationState::start`].
+    unsafe fn start(state: StateRef<'_, Self, R>, subops: Pin<&mut ConnectAllOps<Self, R>>)
     where
         State<Self, R>: ConnectAll<Self, R>,
     {
         let _ = state;
-        subops.start_all();
+        // SAFETY: Recursion invariant holds.
+        unsafe { subops.start_all() };
     }
 
     fn complete(state: StateRef<'_, Self, R>, value: Sum<SenderOutputList<Self::SubSenders>>);
@@ -64,6 +68,7 @@ pub trait SenderExprTo<R>: SenderExpr {
         let _ = state;
     }
 }
+pub type StatePlace<S, R> = ListPlaceT<<S as SenderExpr>::SubSenders, State<S, R>>;
 pub type StateRef<'a, S, R> = ListPlaceRef<'a, <S as SenderExpr>::SubSenders, State<S, R>>;
 
 pub struct BasicReceiver<S, R, U: UIndex>
@@ -74,7 +79,25 @@ where
 {
     index: PhantomData<U>,
     // Effectively a StateRef<'state, S, R>.
-    state: NonNull<<S::SubSenders as ListPlace>::Place<State<S, R>>>,
+    state: NonNull<StatePlace<S, R>>,
+}
+
+unsafe impl<S, R, U> Send for BasicReceiver<S, R, U>
+where
+    S: SenderExprTo<R, SubSenders: IndexList<U, Output: Sender>>,
+    SenderOutputList<S::SubSenders>: repr::Split<SenderOutput<IndexListT<S::SubSenders, U>>, U>,
+    U: UIndex,
+    for<'a> StateRef<'a, S, R>: Send,
+{
+}
+
+unsafe impl<S, R, U> Sync for BasicReceiver<S, R, U>
+where
+    S: SenderExprTo<R, SubSenders: IndexList<U, Output: Sender>>,
+    SenderOutputList<S::SubSenders>: repr::Split<SenderOutput<IndexListT<S::SubSenders, U>>, U>,
+    U: UIndex,
+    for<'a> StateRef<'a, S, R>: Sync,
+{
 }
 
 impl<S, R, U> Receiver<SenderOutput<IndexListT<S::SubSenders, U>>> for BasicReceiver<S, R, U>
@@ -281,7 +304,7 @@ where
     sub_ops: ConnectAllOps<S, R>,
     // `state` itself must not be accessed since creation.
     #[pin]
-    state: ListPlaceT<S::SubSenders, State<S, R>>,
+    state: StatePlace<S, R>,
 }
 
 impl<S, R> BasicOperation<S, R>
@@ -343,10 +366,10 @@ where
     State<S, R>: ConnectAll<S, R>,
     ConnectAllOps<S, R>: OperationStateList,
 {
-    fn start(self: Pin<&mut Self>) {
+    unsafe fn start_by_ref(self: Pin<&mut Self>) {
         let this = self.project();
         let state = <S::SubSenders as ListPlace>::borrow(this.state);
-        S::start(state, this.sub_ops);
+        unsafe { S::start(state, this.sub_ops) };
     }
 }
 

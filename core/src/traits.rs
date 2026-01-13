@@ -1,6 +1,6 @@
-use core::pin::Pin;
+use core::{mem, pin::Pin};
 
-use placid::init::InitPin;
+use placid::{init::InitPin, pin::POwn};
 
 pub trait Scheduler {
     type Task: Sender<Output = ()>;
@@ -16,7 +16,28 @@ pub trait ReceiverFrom<S: Sender + ?Sized>: Receiver<S::Output> {}
 impl<T, S: Sender> ReceiverFrom<S> for T where T: Receiver<S::Output> {}
 
 pub trait OperationState {
-    fn start(self: Pin<&mut Self>);
+    /// Start the operation by reference.
+    ///
+    /// # Safety
+    ///
+    /// - This function must be called only once for this object.
+    /// - Although this object is `mem::forget`ed after this function is called.
+    unsafe fn start_by_ref(self: Pin<&mut Self>);
+
+    /// Start the operation.
+    fn start(mut this: POwn<'_, Self>) {
+        // SAFETY:
+        //
+        // - This function is called only once for this object, since it transfers the
+        //   ownership via `POwn`.
+        // - Although `this` is `mem::forget`ed, its destructor will run in the
+        //   associated `DropSlot`, which will properly drop the operation and satisfy
+        //   the pinning guarantee.
+        unsafe {
+            this.as_mut().start_by_ref();
+            mem::forget(this);
+        }
+    }
 }
 
 pub trait Sender {

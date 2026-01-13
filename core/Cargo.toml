@@ -8,4 +8,5 @@ version.workspace = true
 [dependencies]
 pin-project.workspace = true
 placid.workspace = true
+spin.workspace = true
 tsum.workspace = true

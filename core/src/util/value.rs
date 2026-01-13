@@ -25,7 +25,7 @@ impl<R: Receiver<T>, T> SenderExprTo<R> for ValueExpr<T> {
         init::value(ValueState(Some((data, recv))))
     }
 
-    fn start(state: Pin<&mut State<Self, R>>, _: Pin<&mut ConnectAllOps<Self, R>>)
+    unsafe fn start(state: Pin<&mut State<Self, R>>, _: Pin<&mut ConnectAllOps<Self, R>>)
     where
         State<Self, R>: ConnectAll<Self, R>,
     {
