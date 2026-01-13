@@ -2,20 +2,14 @@ use core::{convert::Infallible, marker::PhantomData, pin::Pin};
 
 use placid::prelude::*;
 
-use crate::{basic::*, traits::Receiver};
+use crate::{basic::*, traits::Receiver, util::ONESHOT_COMPLETED};
 
 pub struct ValueExpr<T>(PhantomData<T>);
 
 impl<T> SenderExpr for ValueExpr<T> {
     type Output = T;
-
     type Data = T;
-
     type SubSenders = ();
-
-    fn receiver_count_down(_: &Self::Data) -> usize {
-        1
-    }
 }
 
 pub struct ValueState<T>(Option<T>);
@@ -35,9 +29,8 @@ impl<R: Receiver<T>, T> SenderExprTo<R> for ValueExpr<T> {
     where
         State<Self, R>: ConnectAll<Self, R>,
     {
-        if let Some((value, recv)) = state.state_mut().0.take() {
-            recv.set(value);
-        }
+        let (value, recv) = state.state_mut().0.take().expect(ONESHOT_COMPLETED);
+        recv.set(value);
     }
 
     fn complete(_: Pin<&mut State<Self, R>>, value: tsum::Sum<()>) {

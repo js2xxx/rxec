@@ -3,7 +3,7 @@ use core::{convert::Infallible, marker::PhantomData, pin::Pin};
 use placid::prelude::*;
 use tsum::{Sum, T, t};
 
-use crate::{Receiver, Sender, basic::*};
+use crate::{Receiver, Sender, basic::*, util::ONESHOT_COMPLETED};
 
 pub struct MapExpr<S, F>(PhantomData<(S, F)>);
 
@@ -13,14 +13,8 @@ where
     F: FnOnce(S::Output) -> T,
 {
     type Output = T;
-
     type Data = F;
-
     type SubSenders = T![S];
-
-    fn receiver_count_down(_: &Self::Data) -> usize {
-        1
-    }
 }
 
 pub struct MapState<T>(Option<T>);
@@ -42,10 +36,9 @@ where
     }
 
     fn complete(state: Pin<&mut State<Self, R>>, value: Sum![S::Output]) {
-        if let Some((func, recv)) = state.state_mut().0.take() {
-            let result = func(value.into_inner());
-            recv.set(result);
-        }
+        let (func, recv) = state.state_mut().0.take().expect(ONESHOT_COMPLETED);
+        let result = func(value.into_inner());
+        recv.set(result);
     }
 }
 

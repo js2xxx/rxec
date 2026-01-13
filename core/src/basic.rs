@@ -36,8 +36,6 @@ pub trait SenderExpr: Sized {
     type Output;
     type Data;
     type SubSenders: SenderList + ListPlace;
-
-    fn receiver_count_down(data: &Self::Data) -> usize;
 }
 
 pub trait SenderExprTo<R>: SenderExpr {
@@ -61,12 +59,18 @@ pub trait SenderExprTo<R>: SenderExpr {
     }
 
     fn complete(state: StateRef<'_, Self, R>, value: Sum<SenderOutputList<Self::SubSenders>>);
+
+    fn stop(state: StateRef<'_, Self, R>) {
+        let _ = state;
+    }
 }
 pub type StateRef<'a, S, R> = ListPlaceRef<'a, <S as SenderExpr>::SubSenders, State<S, R>>;
 
 pub struct BasicReceiver<S, R, U: UIndex>
 where
-    S: SenderExprTo<R>,
+    S: SenderExprTo<R, SubSenders: IndexList<U, Output: Sender>>,
+    SenderOutputList<S::SubSenders>: repr::Split<SenderOutput<IndexListT<S::SubSenders, U>>, U>,
+    U: UIndex,
 {
     index: PhantomData<U>,
     // Effectively a StateRef<'state, S, R>.
@@ -89,6 +93,18 @@ where
             unsafe { <S::SubSenders as ListPlace>::from_raw(self.state) },
             Sum::new(value),
         );
+    }
+}
+
+impl<S, R, U> Drop for BasicReceiver<S, R, U>
+where
+    S: SenderExprTo<R, SubSenders: IndexList<U, Output: Sender>>,
+    SenderOutputList<S::SubSenders>: repr::Split<SenderOutput<IndexListT<S::SubSenders, U>>, U>,
+    U: UIndex,
+{
+    fn drop(&mut self) {
+        // SAFETY: See the safety comment in `<Self as Receiver<T>>::set`.
+        S::stop(unsafe { <S::SubSenders as ListPlace>::from_raw(self.state) });
     }
 }
 

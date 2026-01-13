@@ -8,6 +8,8 @@ pub use self::{
     value::{Value, value},
 };
 
+const ONESHOT_COMPLETED: &str = "oneshot sender already completed";
+
 #[cfg(test)]
 mod tests {
     use placid::pown;

@@ -8,7 +8,7 @@ use pin_project::pin_project;
 use placid::{place::DynPlace, prelude::*};
 use tsum::{Sum, T, t};
 
-use crate::{OperationState, ReceiverFrom, Sender, SenderTo, basic::*};
+use crate::{OperationState, ReceiverFrom, Sender, SenderTo, basic::*, util::ONESHOT_COMPLETED};
 
 pub struct AndThenExpr<S, F>(PhantomData<(S, F)>);
 
@@ -31,10 +31,6 @@ where
     type Output = T::Output;
     type Data = F;
     type SubSenders = T![S];
-
-    fn receiver_count_down(_: &Self::Data) -> usize {
-        1
-    }
 }
 
 impl<S, F, T, R> SenderExprTo<R> for AndThenExpr<S, F>
@@ -58,13 +54,12 @@ where
 
     fn complete(state: Pin<&mut State<Self, R>>, value: Sum![S::Output]) {
         let state = state.state_mut().project();
-        if let Some((func, recv)) = state.data.take() {
-            let next_sender = func(value.into_inner());
-            let next_op = next_sender.connect(recv);
+        let (func, recv) = state.data.take().expect(ONESHOT_COMPLETED);
+        let next_snd = func(value.into_inner());
+        let next_op = next_snd.connect(recv);
 
-            if let Ok(next_op) = state.next_op.try_insert_pin(next_op) {
-                next_op.start();
-            }
+        if let Ok(next_op) = state.next_op.try_insert_pin(next_op) {
+            next_op.start();
         }
     }
 }

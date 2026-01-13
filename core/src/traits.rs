@@ -26,7 +26,7 @@ pub type SenderOutput<S> = <S as Sender>::Output;
 
 pub trait SenderTo<Recv: Receiver<Self::Output>>: Sender {
     type Operation: OperationState;
-    type ConnectError;
+    type ConnectError: core::fmt::Debug;
 
     fn connect(self, receiver: Recv) -> impl InitPin<Self::Operation, Error = Self::ConnectError>;
 }
