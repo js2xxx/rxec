@@ -69,9 +69,9 @@ where
     }
 }
 
-pub type AndThen<'a, S, F> = BasicSender<'a, AndThenExpr<S, F>>;
+pub type AndThen<S, F> = BasicSender<AndThenExpr<S, F>>;
 
-pub const fn and_then<'a, S, F, T>(sender: S, func: F) -> AndThen<'a, S, F>
+pub const fn and_then<S, F, T>(sender: S, func: F) -> AndThen<S, F>
 where
     S: Sender,
     F: FnOnce(S::Output) -> T,

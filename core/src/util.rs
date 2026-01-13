@@ -9,23 +9,11 @@ pub use self::{
 };
 
 #[cfg(test)]
-#[allow(unused)]
 mod tests {
-    use std::marker::PhantomData;
-
     use placid::pown;
-    use tsum::{
-        T,
-        sum::index::{UInt, UTerm},
-    };
 
     use super::*;
-    use crate::{
-        OperationState, Receiver, SenderTo,
-        basic::{BasicReceiver, BasicSender, State, ConnectAll, SenderExpr, SenderExprTo},
-        list::{CountList, CountListT},
-        util::{map::MapExpr, value::ValueExpr},
-    };
+    use crate::{OperationState, Receiver, SenderTo};
 
     struct DummyReceiver;
 
@@ -38,7 +26,7 @@ mod tests {
     #[test]
     fn it_works() {
         let s = and_then(map(value(1), |i| i + 1), |t| value(t + 2));
-        let i = SenderTo::<DummyReceiver>::connect(s, DummyReceiver);
+        let i = s.connect(DummyReceiver);
         let mut op = pown!(i);
         op.as_mut().start();
     }

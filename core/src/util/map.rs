@@ -49,9 +49,9 @@ where
     }
 }
 
-pub type Map<'a, S, F> = BasicSender<'a, MapExpr<S, F>>;
+pub type Map<S, F> = BasicSender<MapExpr<S, F>>;
 
-pub const fn map<'a, S, F, T>(sender: S, func: F) -> Map<'a, S, F>
+pub const fn map<S, F, T>(sender: S, func: F) -> Map<S, F>
 where
     S: Sender,
     F: FnOnce(S::Output) -> T,

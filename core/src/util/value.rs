@@ -31,9 +31,9 @@ impl<R: Receiver<T>, T> SenderExprTo<R> for ValueExpr<T> {
         init::value(ValueState(Some((data, recv))))
     }
 
-    fn start<'a>(state: Pin<&mut State<Self, R>>, _: Pin<&mut ConnectAllOps<'a, Self, R>>)
+    fn start(state: Pin<&mut State<Self, R>>, _: Pin<&mut ConnectAllOps<Self, R>>)
     where
-        State<Self, R>: ConnectAll<'a, Self, R>,
+        State<Self, R>: ConnectAll<Self, R>,
     {
         if let Some((value, recv)) = state.state_mut().0.take() {
             recv.set(value);
@@ -45,8 +45,8 @@ impl<R: Receiver<T>, T> SenderExprTo<R> for ValueExpr<T> {
     }
 }
 
-pub type Value<'a, T> = BasicSender<'a, ValueExpr<T>>;
+pub type Value<T> = BasicSender<ValueExpr<T>>;
 
-pub const fn value<'a, T>(value: T) -> Value<'a, T> {
+pub const fn value<T>(value: T) -> Value<T> {
     BasicSender::new(value, ())
 }
