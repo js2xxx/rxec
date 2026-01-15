@@ -11,7 +11,7 @@ pub use self::{
     future::{Async, async_},
     map::{Map, map},
     value::{Value, value},
-    wait::{CanceledError, Wait, wait},
+    wait::{CanceledError, wait},
 };
 
 const ONESHOT_COMPLETED: &str = "oneshot sender already completed";
